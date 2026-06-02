@@ -1,57 +1,64 @@
 # Pygame Chess
 
-A chess game built with Python, featuring a Pygame UI, `python-chess` for game logic, and Stockfish as the opponent engine.
+A feature-rich, single-player chess game built with Python and Pygame. Play against a configurable Stockfish AI opponent and analyze your games.
+
+![Gameplay Screenshot](https://i.imgur.com/your_screenshot.png) 
+*(You can replace this with a real screenshot of your game)*
 
 ## Features
 
-*   **Play Against AI**: Play a full game against the Stockfish engine.
-*   **Graphical UI**: A clean and simple chessboard with drag-and-drop controls.
-*   **Move Highlights**: Visual feedback for selected pieces, legal moves, captures, and checks.
-*   **Game State Management**: Start menu, game over screens, and pawn promotion dialogs.
-*   **Timers & Move Counter**: Timed games and a 50-move rule counter.
-*   **Automated Asset Management**: Automatically downloads high-quality SVG piece images, with a built-in fallback generator for offline use.
+- **Play Against AI**: Challenge the powerful Stockfish chess engine.
+- **Configurable Difficulty**: Choose from multiple skill levels (Easy, Medium, Hard, Expert) to match your ability.
+- **Selectable Time Controls**: Play games with 3, 5, 10, or 30-minute timers.
+- **Live Evaluation Bar**: See a real-time analysis of the current position from the engine's perspective.
+- **Move History**: A scrollable list of all moves made during the game.
+- **PGN Export**: Save your completed games to a `.pgn` file for analysis in other chess software.
+- **Multiple Input Methods**: Move pieces using either drag-and-drop or click-to-move.
+- **Automatic Setup**: The required chess engine (Stockfish) is downloaded automatically when you first run the game.
+- **High-Quality Assets**: Uses SVG-based assets for crisp visuals, with a fallback to generated PNGs if needed.
 
-## Technology Stack
+## How to Run
 
-*   **UI**: [Pygame-CE](https://pyga.me/)
-*   **Game Logic**: [python-chess](https://github.com/niklasf/python-chess)
-*   **Engine**: [Stockfish](https://stockfishchess.org/)
-*   **Dependencies**: `pygame-svg`, `requests`, `stockfish`
+This project is designed to be run from a local development environment.
 
-## Setup and Run
+### Prerequisites
 
-### 1. Download Stockfish
+- Python 3.x
+- `pip` for package management
 
-Before running the game, you must download the Stockfish chess engine.
+### Setup and Execution
 
-1.  Go to the [Stockfish download page](https://stockfishchess.org/download/).
-2.  Download the appropriate version for your operating system (e.g., Windows x64, macOS Apple Silicon).
-3.  Extract the zip file.
-4.  Place the Stockfish executable (e.g., `stockfish.exe` on Windows) into the root directory of this project, or update the `STOCKFISH_PATH` in `config.py` to point to its location.
+Two run scripts are provided for convenience: `runfile.ps1` for Windows (PowerShell) and `runfile.sh` for macOS and Linux.
 
-### 2. Run the Game
-
-The project includes convenient scripts to set up the environment and run the application.
-
-#### On Windows
-
-Open a PowerShell terminal and run:
-
+**On Windows:**
 ```powershell
 .\runfile.ps1
 ```
 
-#### On macOS / Linux
-
-Open a terminal and run:
-
+**On macOS/Linux:**
 ```bash
 chmod +x runfile.sh
 ./runfile.sh
 ```
 
-These scripts will:
-1.  Create a Python virtual environment (`.venv`).
-2.  Install all the required dependencies from `requirements.txt`.
-3.  Check for and download the required chess piece assets.
-4.  Launch the game.
+When you run the script for the first time, it will:
+1. Create a local Python virtual environment (`.venv`).
+2. Install all the required Python packages from `requirements.txt`.
+3. Download and set up the Stockfish chess engine executable.
+4. Download high-quality SVG piece assets.
+5. Launch the game.
+
+Subsequent runs will be much faster as they will use the existing environment and assets.
+
+## Project Structure
+
+- `main.py`: The main application entry point, containing the game loop and event handling.
+- `engine.py`: Manages the Stockfish chess engine process.
+- `game_state.py`: Handles the chess board logic, timers, and move history.
+- `ui.py`: Contains all functions related to drawing the game board, pieces, menus, and other UI elements.
+- `config.py`: Central configuration for screen dimensions, colors, fonts, and engine settings.
+- `runfile.ps1` / `runfile.sh`: Scripts to automate setup and execution.
+- `requirements.txt`: A list of all Python dependencies.
+- `assets/`: Contains game assets like piece images and sounds.
+- `download_assets.py`: A script to download primary SVG piece assets.
+- `asset_manager.py`: A fallback script to generate PNG piece assets if the download fails.

@@ -1,11 +1,14 @@
 import pygame
 import chess
-import pygame_svg
 import os
+import chess.pgn
+import time
 from config import *
 
 IMAGES = {}
 SOUNDS = {}
+TIME_CONTROL_RECTS = {}
+DIFFICULTY_RECTS = {}
 
 def load_assets():
     """Loads all game assets, including images and sounds."""
@@ -16,15 +19,22 @@ def load_assets():
     load_sounds()
 
 def load_images():
-    """Loads piece images."""
+    """Loads piece images, preferring SVG over PNG."""
     pieces = ['wp', 'wn', 'wb', 'wr', 'wq', 'wk', 'bp', 'bn', 'bb', 'br', 'bq', 'bk']
     for piece in pieces:
         svg_path = os.path.join(PIECES_DIR, f"{piece}.svg")
         png_path = os.path.join(PIECES_DIR, f"{piece}.png")
-        if os.path.exists(svg_path):
-            IMAGES[piece] = pygame_svg.Svg(svg_path, size=(SQUARE_SIZE, SQUARE_SIZE))
-        elif os.path.exists(png_path):
-            IMAGES[piece] = pygame.transform.smoothscale(pygame.image.load(png_path), (SQUARE_SIZE, SQUARE_SIZE))
+        
+        try:
+            if os.path.exists(svg_path):
+                image = pygame.image.load(svg_path)
+                IMAGES[piece] = pygame.transform.smoothscale(image, (SQUARE_SIZE, SQUARE_SIZE))
+            elif os.path.exists(png_path):
+                IMAGES[piece] = pygame.transform.smoothscale(pygame.image.load(png_path), (SQUARE_SIZE, SQUARE_SIZE))
+        except pygame.error as e:
+            print(f"Failed to load asset for {piece}: {e}")
+            if os.path.exists(png_path):
+                IMAGES[piece] = pygame.transform.smoothscale(pygame.image.load(png_path), (SQUARE_SIZE, SQUARE_SIZE))
 
 def load_sounds():
     """Loads sound effects."""
@@ -45,12 +55,9 @@ def draw_board(screen):
         for c in range(8):
             color = LIGHT_SQUARE if (r + c) % 2 == 0 else DARK_SQUARE
             pygame.draw.rect(screen, color, pygame.Rect(c * SQUARE_SIZE, r * SQUARE_SIZE, SQUARE_SIZE, SQUARE_SIZE))
-    # Draw rank/file labels
     for i in range(8):
-        # Ranks (1-8)
         label = UI_FONT.render(str(8 - i), True, DARK_SQUARE if i % 2 == 0 else LIGHT_SQUARE)
         screen.blit(label, (5, i * SQUARE_SIZE + 5))
-        # Files (a-h)
         label = UI_FONT.render(chr(ord('a') + i), True, LIGHT_SQUARE if i % 2 == 0 else DARK_SQUARE)
         screen.blit(label, (i * SQUARE_SIZE + SQUARE_SIZE - 15, BOARD_SIZE - 25))
 
@@ -66,7 +73,7 @@ def draw_pieces(screen, board, dragging_square):
 
 def draw_dragged_piece(screen, piece_key, pos):
     if piece_key in IMAGES:
-        img = IMAGES[piece_key].surface if isinstance(IMAGES[piece_key], pygame_svg.Svg) else IMAGES[piece_key]
+        img = IMAGES[piece_key]
         screen.blit(img, img.get_rect(center=pos))
 
 def draw_highlights(screen, board, selected_square, last_move):
@@ -139,76 +146,110 @@ def draw_eval_bar(screen, eval_data):
     """Draws the evaluation bar beside the board."""
     bar_width = 20
     bar_rect = pygame.Rect(BOARD_SIZE, 0, bar_width, BOARD_SIZE)
-    
-    # Background is black advantage
     pygame.draw.rect(screen, (40, 40, 40), bar_rect)
     
     if not eval_data:
-        # Draw a neutral bar if no eval
         pygame.draw.rect(screen, (200, 200, 200), pygame.Rect(BOARD_SIZE, BOARD_SIZE // 2, bar_width, BOARD_SIZE // 2))
         return
 
-    # Calculate fill percentage for white (0.0 to 1.0)
-    # A standard way is to map centipawns to a win probability or a simple clamp
-    # Let's map -1000 to 1000 cp (or mates) to 0.0 - 1.0
     fill_percent = 0.5
-    
     if eval_data['type'] == 'cp':
-        cp = eval_data['value']
-        # Clamp between -1000 and 1000
-        cp = max(-1000, min(1000, cp))
-        # Map to 0-1 (e.g. 0 cp -> 0.5, 1000 cp -> 1.0)
-        # Using a non-linear scale is better, but linear is fine for now
-        # Actually, let's use a standard scaling where 1 pawn = small shift, 5 pawns = big shift
+        cp = max(-1000, min(1000, eval_data['value']))
         fill_percent = 0.5 + (cp / 2000.0)
     elif eval_data['type'] == 'mate':
-        mate_in = eval_data['value']
-        if mate_in > 0:
-            fill_percent = 1.0 # White is mating
-        elif mate_in < 0:
-            fill_percent = 0.0 # Black is mating
+        fill_percent = 1.0 if eval_data['value'] > 0 else 0.0
             
     fill_percent = max(0.0, min(1.0, fill_percent))
-            
     white_height = int(BOARD_SIZE * fill_percent)
     white_rect = pygame.Rect(BOARD_SIZE, BOARD_SIZE - white_height, bar_width, white_height)
     pygame.draw.rect(screen, (220, 220, 220), white_rect)
 
-def draw_side_panel(screen, game_state, eval_data=None):
-    """Draws the right-side panel with timers and info."""
-    # Start drawing panel *after* the eval bar
+def draw_side_panel(screen, game_state, eval_data=None, scroll_y=0):
+    """Draws the right-side panel with timers, info, and move history."""
     panel_start_x = BOARD_SIZE + 20
-    panel_rect = pygame.Rect(panel_start_x, 0, WIDTH - panel_start_x, HEIGHT)
+    panel_width = WIDTH - panel_start_x
+    panel_rect = pygame.Rect(panel_start_x, 0, panel_width, HEIGHT)
     pygame.draw.rect(screen, BG_COLOR, panel_rect)
 
     draw_eval_bar(screen, eval_data)
 
-    # Timers
     black_time_str = format_time(game_state.timers[chess.BLACK])
     white_time_str = format_time(game_state.timers[chess.WHITE])
-
-    # Highlight active timer
     black_color = HIGHLIGHT_LAST_MOVE if game_state.board.turn == chess.BLACK and not game_state.game_over else (200, 200, 200)
     white_color = HIGHLIGHT_LAST_MOVE if game_state.board.turn == chess.WHITE and not game_state.game_over else (200, 200, 200)
-
     black_timer = UI_FONT_LARGE.render(black_time_str, True, black_color)
     white_timer = UI_FONT_LARGE.render(white_time_str, True, white_color)
-
     screen.blit(black_timer, (panel_start_x + 30, 50))
     screen.blit(white_timer, (panel_start_x + 30, HEIGHT - 100))
 
-    # 50-move rule counter
-    halfmove_clock = game_state.board.halfmove_clock
-    rule_text = f"50-Move Rule: {halfmove_clock}/100"
-    rule_label = UI_FONT.render(rule_text, True, (150, 150, 150))
-    screen.blit(rule_label, (panel_start_x + 20, HEIGHT // 2))
-    
-    # Display numeric eval text
     if eval_data:
-        if eval_data['type'] == 'cp':
-            eval_text = f"{eval_data['value'] / 100.0:+.2f}"
-        else:
-            eval_text = f"M{abs(eval_data['value'])}"
-            if eval_data['value'] < 0: eval_text = "-" + eval_text
+        eval_text = f"{eval_data['value'] / 100.0:+.2f}" if eval_data['type'] == 'cp' else f"M{abs(eval_data['value'])}"
+        if eval_data['type'] == 'mate' and eval_data['value'] < 0: eval_text = "-" + eval_text
         eval_label = UI_FONT.render(eval_text, True, (200, 200, 200))
         screen.blit(eval_label, (panel_start_x + 20, HEIGHT // 2 + 40))
+    
+    move_history_y_start = 120
+    move_area_height = HEIGHT - 240
+    move_surface = pygame.Surface((panel_width, move_area_height))
+    move_surface.fill(BG_COLOR)
+
+    y_offset = 0
+    for i, san_move in enumerate(game_state.san_moves):
+        move_number = i // 2 + 1
+        if i % 2 == 0:
+            text = f"{move_number}. {san_move}"
+            move_label = UI_FONT.render(text, True, (200, 200, 200))
+            move_surface.blit(move_label, (10, y_offset - scroll_y))
+        else:
+            text = f"{san_move}"
+            move_label = UI_FONT.render(text, True, (200, 200, 200))
+            move_surface.blit(move_label, (110, y_offset - scroll_y))
+            y_offset += 30
+    
+    screen.blit(move_surface, (panel_start_x, move_history_y_start))
+
+def draw_timer_selection(screen):
+    """Draws the timer selection screen."""
+    s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    s.fill((0, 0, 0, 150))
+    screen.blit(s, (0, 0))
+    
+    title = UI_FONT_LARGE.render("Select Time Control", True, (255, 255, 255))
+    screen.blit(title, title.get_rect(center=(WIDTH / 2, 100)))
+
+    for i, (text, time) in enumerate(TIME_CONTROLS.items()):
+        rect = pygame.Rect(WIDTH // 2 - 100, 200 + i * 70, 200, 50)
+        TIME_CONTROL_RECTS[text] = rect
+        draw_button(screen, text.replace('_', ' '), rect)
+
+def draw_difficulty_selection(screen):
+    """Draws the difficulty selection screen."""
+    s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    s.fill((0, 0, 0, 150))
+    screen.blit(s, (0, 0))
+    
+    title = UI_FONT_LARGE.render("Select Difficulty", True, (255, 255, 255))
+    screen.blit(title, title.get_rect(center=(WIDTH / 2, 100)))
+
+    for i, (text, level) in enumerate(DIFFICULTY_LEVELS.items()):
+        rect = pygame.Rect(WIDTH // 2 - 100, 200 + i * 70, 200, 50)
+        DIFFICULTY_RECTS[text] = rect
+        draw_button(screen, text, rect)
+
+def save_pgn(game_state):
+    """Saves the game to a PGN file."""
+    game = chess.pgn.Game()
+    game.headers["Event"] = "Pygame Chess Match"
+    game.headers["White"] = "Player"
+    game.headers["Black"] = "Stockfish"
+    game.headers["Date"] = time.strftime("%Y.%m.%d")
+    
+    board = chess.Board()
+    for move in game_state.board.move_stack:
+        board.push(move)
+    
+    game.add_line(game_state.board.move_stack)
+
+    with open("last_game.pgn", "w") as f:
+        print(game, file=f, end="\n\n")
+    print("Game saved to last_game.pgn")

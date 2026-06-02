@@ -1,6 +1,7 @@
 import pygame
 import chess
 import os
+import sys
 
 # Screen dimensions
 WIDTH = 800
@@ -23,6 +24,7 @@ HIGHLIGHT_CHECK = pygame.Color(255, 0, 0, 120)
 
 # Time Controls (in seconds)
 TIME_CONTROLS = {
+    '3_MIN': 180,
     '5_MIN': 300,
     '10_MIN': 600,
     '30_MIN': 1800
@@ -30,7 +32,7 @@ TIME_CONTROLS = {
 DEFAULT_TIME = TIME_CONTROLS['10_MIN']
 
 # UI Fonts
-UI_FONT_SIZE = 30
+UI_FONT_SIZE = 24
 UI_FONT_LARGE_SIZE = 50
 UI_FONT = None
 UI_FONT_LARGE = None
@@ -41,8 +43,20 @@ PIECES_DIR = os.path.join(ASSETS_DIR, 'pieces')
 SOUNDS_DIR = os.path.join(ASSETS_DIR, 'sounds')
 
 # --- Engine Settings ---
-# IMPORTANT: Download the Stockfish executable for your OS and place it in the project root,
-# or update this path to point to the executable.
-STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), "stockfish.exe")
-ENGINE_DIFFICULTY = 10 # Stockfish skill level (0-20)
+if sys.platform == "win32":
+    STOCKFISH_EXECUTABLE = "stockfish.exe"
+else:
+    STOCKFISH_EXECUTABLE = "stockfish"
+
+STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), STOCKFISH_EXECUTABLE)
+
+# Difficulty levels (0-20).
+DIFFICULTY_LEVELS = {
+    'Easy': 1,
+    'Medium': 5,
+    'Hard': 10,
+    'Expert': 20
+}
+DEFAULT_DIFFICULTY = DIFFICULTY_LEVELS['Easy']
+
 AI_PLAYS_AS = chess.BLACK

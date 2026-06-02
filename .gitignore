@@ -1,20 +1,21 @@
-# Virtual Environment
-.venv/
-venv/
-ENV/
-
-# IDE specific files
-.idea/
-*.swp
-*.swo
-
-# Python cache
+# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv/
 
-# Build artifacts
-build/
-dist/
-*.egg-info/
+# IDE
+.idea/
+
+# Game Assets & Output
+/stockfish.exe
+/stockfish
+/last_game.pgn
+
+# Temporary download files
+*.zip
+*.tar
+stockfish_temp/
+/assets/pieces/*.png
+!/assets/pieces/placeholder.txt

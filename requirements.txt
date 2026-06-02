@@ -1,6 +1,4 @@
 pygame-ce
 python-chess
-setuptools
-pygame-svg
 requests
 stockfish
