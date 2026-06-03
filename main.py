@@ -39,7 +39,12 @@ def engine_worker(queue, engine):
 
 def main():
     pygame.init()
-    pygame.mixer.init()
+    try:
+        pygame.mixer.init()
+    except pygame.error as e:
+        print(f"Warning: Could not initialize sound mixer: {e}")
+        # Sounds will be disabled if this fails.
+
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Pygame Chess vs Stockfish")
     load_assets()
