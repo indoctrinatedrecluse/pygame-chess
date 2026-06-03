@@ -61,16 +61,16 @@ fi
 
 # --- Asset Management ---
 mkdir -p assets/pieces
-SVG_COUNT=$(ls -1 assets/pieces/*.svg 2>/dev/null | wc -l)
-if [ "$SVG_COUNT" -lt 12 ]; then
-    echo "Primary SVG assets not fully present. Attempting to download..."
+PNG_COUNT=$(ls -1 assets/pieces/*.png 2>/dev/null | wc -l)
+if [ "$PNG_COUNT" -lt 12 ]; then
+    echo "Primary PNG assets not fully present. Attempting to download..."
     python download_assets.py
     if [ $? -ne 0 ]; then
-        echo "SVG download failed. Generating fallback PNG assets..."
+        echo "PNG download failed. Generating fallback PNG assets..."
         python asset_manager.py
     fi
 else
-    echo "Primary SVG assets found."
+    echo "Primary PNG assets found."
 fi
 
 # Run the main application

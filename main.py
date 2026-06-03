@@ -2,33 +2,35 @@ import pygame
 import chess
 import threading
 import time
+import random
 from queue import Queue
 from config import *
 from ui import (load_assets, play_sound, draw_board, draw_pieces, draw_dragged_piece, 
                 draw_highlights, draw_game_over, draw_button, get_promotion_choice,
                 draw_side_panel, draw_timer_selection, draw_difficulty_selection, 
-                save_pgn, TIME_CONTROL_RECTS, DIFFICULTY_RECTS)
+                draw_side_selection, SIDE_RECTS, TIME_CONTROL_RECTS, DIFFICULTY_RECTS)
 from game_state import GameState
 from engine import ChessEngine
 
-# --- Custom Events ---
 AI_MOVE_EVENT = pygame.USEREVENT + 1
 EVAL_UPDATE_EVENT = pygame.USEREVENT + 2
-
-# --- Thread-safe Queue for Engine Communication ---
 engine_queue = Queue()
 
-def get_square_from_mouse(pos):
-    """Converts mouse coordinates to a chess square index."""
+def get_square_from_mouse(pos, board_flipped):
+    """Converts mouse coordinates to a chess square index, handling a flipped board."""
     if pos[0] > BOARD_SIZE or pos[1] > BOARD_SIZE: return None
-    return chess.square(pos[0] // SQUARE_SIZE, 7 - (pos[1] // SQUARE_SIZE))
+    col, row = pos[0] // SQUARE_SIZE, pos[1] // SQUARE_SIZE
+    if board_flipped:
+        return chess.square(7 - col, row)
+    else:
+        return chess.square(col, 7 - row)
 
 def engine_worker(queue, engine):
     """The main worker function for the engine thread."""
     while True:
         task, board = queue.get()
         if task == 'get_move':
-            best_move = engine.get_best_move(board)
+            best_move = engine.get_humanized_move(board)
             pygame.event.post(pygame.event.Event(AI_MOVE_EVENT, {'move': best_move}))
         elif task == 'get_eval':
             eval_data = engine.get_evaluation(board)
@@ -48,21 +50,16 @@ def main():
     
     if engine.is_ready():
         threading.Thread(target=engine_worker, args=(engine_queue, engine), daemon=True).start()
-    else:
-        print("WARNING: Stockfish engine not found or not configured. AI will not play.")
 
     selected_square = None
     dragging = False
-    scroll_y = 0
-    
+    board_flipped = False
     current_eval = None
     last_eval_time = 0
     EVAL_UPDATE_INTERVAL = 2000
 
     start_button = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 - 25, 200, 50)
-    save_pgn_button = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 50, 200, 50)
-    exit_button = pygame.Rect(WIDTH // 2 - 100, HEIGHT // 2 + 125, 200, 50)
-    resign_button = pygame.Rect(WIDTH - 160, HEIGHT - 60, 140, 40)
+    flip_button = pygame.Rect(WIDTH - 160, HEIGHT - 120, 140, 40)
     
     clock = pygame.time.Clock()
     selected_time = DEFAULT_TIME
@@ -100,10 +97,6 @@ def main():
             if event.type == EVAL_UPDATE_EVENT:
                 current_eval = event.eval
 
-            if event.type == pygame.MOUSEWHEEL:
-                scroll_y -= event.y * 20
-                scroll_y = max(0, scroll_y)
-
             if app_state == 'MENU':
                 if event.type == pygame.MOUSEBUTTONDOWN and start_button.collidepoint(event.pos):
                     app_state = 'SELECT_TIME'
@@ -120,92 +113,82 @@ def main():
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     for diff, rect in DIFFICULTY_RECTS.items():
                         if rect.collidepoint(event.pos):
-                            engine.set_difficulty(DIFFICULTY_LEVELS[diff])
+                            engine.set_difficulty(diff)
+                            app_state = 'SELECT_SIDE'
+                            break
+            
+            elif app_state == 'SELECT_SIDE':
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    for side_text, rect in SIDE_RECTS.items():
+                        if rect.collidepoint(event.pos):
+                            if side_text == 'White':
+                                PLAYER_PLAYS_AS = chess.WHITE
+                            elif side_text == 'Black':
+                                PLAYER_PLAYS_AS = chess.BLACK
+                            else: # Random
+                                PLAYER_PLAYS_AS = random.choice([chess.WHITE, chess.BLACK])
+                            
+                            AI_PLAYS_AS = not PLAYER_PLAYS_AS
+                            board_flipped = (PLAYER_PLAYS_AS == chess.BLACK)
+                            
                             gs.reset(time_control=selected_time)
                             app_state = 'PLAYING'
                             play_sound('start')
                             break
 
             elif app_state == 'GAME_OVER':
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    if start_button.collidepoint(event.pos):
-                        app_state = 'SELECT_TIME'
-                        current_eval = None
-                        scroll_y = 0
-                    elif save_pgn_button.collidepoint(event.pos):
-                        save_pgn(gs)
-                    elif exit_button.collidepoint(event.pos):
-                        pygame.quit()
-                        return
+                if event.type == pygame.MOUSEBUTTONDOWN and start_button.collidepoint(event.pos):
+                    app_state = 'SELECT_TIME'
+                    current_eval = None
 
-            elif app_state == 'PLAYING' and gs.board.turn != AI_PLAYS_AS:
+            elif app_state == 'PLAYING':
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     pos = pygame.mouse.get_pos()
-                    if resign_button.collidepoint(pos):
-                        gs.resign()
-                        app_state = 'GAME_OVER'
-                        play_sound('end')
+                    if flip_button.collidepoint(pos):
+                        board_flipped = not board_flipped
                         continue
 
-                    sq = get_square_from_mouse(pos)
-                    if sq is not None:
-                        if selected_square is None:
+                    if gs.board.turn == PLAYER_PLAYS_AS:
+                        sq = get_square_from_mouse(pos, board_flipped)
+                        if sq is not None:
                             piece = gs.board.piece_at(sq)
                             if piece and piece.color == gs.board.turn:
                                 selected_square = sq
-                        else:
-                            if selected_square == sq:
-                                selected_square = None
-                                continue
-                            
-                            move = chess.Move(selected_square, sq)
-                            is_pawn = gs.board.piece_at(selected_square).piece_type == chess.PAWN
-                            is_promo = chess.square_rank(sq) in [0, 7]
-                            if is_pawn and is_promo and chess.Move(selected_square, sq, promotion=chess.QUEEN) in gs.board.legal_moves:
-                                promo_choice = get_promotion_choice(screen, gs.board.turn)
-                                move = chess.Move(selected_square, sq, promotion=promo_choice)
-
-                            if move in gs.board.legal_moves:
-                                is_capture = gs.board.is_capture(move)
-                                gs.push_move(move)
-                                play_sound('capture' if is_capture else 'move')
-                                if gs.game_over:
-                                    app_state = 'GAME_OVER'
-                                    play_sound('end')
-                            else:
-                                play_sound('error')
-                            selected_square = None
-                
-                elif event.type == pygame.MOUSEMOTION:
-                    if selected_square is not None and pygame.mouse.get_pressed()[0]:
-                        dragging = True
+                                dragging = True
                 
                 elif event.type == pygame.MOUSEBUTTONUP:
                     if dragging:
-                        end_square = get_square_from_mouse(pygame.mouse.get_pos())
-                        if end_square is not None and selected_square is not None:
-                            move = chess.Move(selected_square, end_square)
+                        end_square = get_square_from_mouse(pygame.mouse.get_pos(), board_flipped)
+                        move = None
+                        if end_square is not None:
                             is_pawn = gs.board.piece_at(selected_square).piece_type == chess.PAWN
                             is_promo = chess.square_rank(end_square) in [0, 7]
-                            if is_pawn and is_promo and chess.Move(selected_square, end_square, promotion=chess.QUEEN) in gs.board.legal_moves:
+                            promo_choice = None
+                            
+                            test_promo_move = chess.Move(selected_square, end_square, promotion=chess.QUEEN)
+                            if is_pawn and is_promo and test_promo_move in gs.board.legal_moves:
                                 promo_choice = get_promotion_choice(screen, gs.board.turn)
-                                move = chess.Move(selected_square, end_square, promotion=promo_choice)
-
-                            if move in gs.board.legal_moves:
-                                is_capture = gs.board.is_capture(move)
-                                gs.push_move(move)
-                                play_sound('capture' if is_capture else 'move')
-                                if gs.game_over:
-                                    app_state = 'GAME_OVER'
-                                    play_sound('end')
-                        selected_square = None
+                                
+                            move = chess.Move(selected_square, end_square, promotion=promo_choice)
+                        
+                        if move and move in gs.board.legal_moves:
+                            is_capture = gs.board.is_capture(move)
+                            gs.push_move(move)
+                            play_sound('capture' if is_capture else 'move')
+                            if gs.game_over:
+                                app_state = 'GAME_OVER'
+                                play_sound('end')
+                        else:
+                            if end_square != selected_square:
+                                play_sound('error')
                     dragging = False
+                    selected_square = None
 
         screen.fill(BG_COLOR)
         
         if app_state == 'MENU':
-            draw_board(screen)
-            draw_pieces(screen, gs.board, None)
+            draw_board(screen, board_flipped)
+            draw_pieces(screen, gs.board, None, board_flipped)
             draw_side_panel(screen, gs, current_eval)
             s = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             s.fill((0, 0, 0, 150))
@@ -217,21 +200,24 @@ def main():
         
         elif app_state == 'SELECT_DIFFICULTY':
             draw_difficulty_selection(screen)
+            
+        elif app_state == 'SELECT_SIDE':
+            draw_side_selection(screen)
 
         else: # PLAYING or GAME_OVER
-            draw_board(screen)
+            draw_board(screen, board_flipped)
             last_move = gs.board.peek() if gs.board.move_stack else None
-            draw_highlights(screen, gs.board, selected_square, last_move)
-            draw_pieces(screen, gs.board, selected_square if dragging else None)
+            draw_highlights(screen, gs.board, selected_square, last_move, board_flipped)
+            draw_pieces(screen, gs.board, selected_square if dragging else None, board_flipped)
             if dragging and selected_square:
                 piece = gs.board.piece_at(selected_square)
                 if piece:
                     piece_key = f"{'w' if piece.color == chess.WHITE else 'b'}{piece.symbol().lower()}"
                     draw_dragged_piece(screen, piece_key, pygame.mouse.get_pos())
             
-            draw_side_panel(screen, gs, current_eval, scroll_y)
+            draw_side_panel(screen, gs, current_eval)
             if app_state == 'PLAYING':
-                draw_button(screen, "Resign", resign_button)
+                draw_button(screen, "Flip Board", flip_button)
 
             if app_state == 'GAME_OVER':
                 result_text = "Draw!"
@@ -239,12 +225,8 @@ def main():
                     winner = gs.outcome.winner
                     if winner is not None:
                         result_text = f"{'White' if winner else 'Black'} wins!"
-                    else:
-                        result_text = "Draw"
                 draw_game_over(screen, result_text)
                 draw_button(screen, "New Game", start_button)
-                draw_button(screen, "Save PGN", save_pgn_button)
-                draw_button(screen, "Exit Game", exit_button)
 
         pygame.display.flip()
         clock.tick(60)

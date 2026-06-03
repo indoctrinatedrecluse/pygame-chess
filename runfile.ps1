@@ -55,16 +55,16 @@ if (-not (Test-Path $stockfishExe)) {
 
 # --- Asset Management ---
 New-Item -ItemType Directory -Force -Path "assets/pieces" | Out-Null
-$svgCount = (Get-ChildItem "assets/pieces" -Filter "*.svg" | Measure-Object).Count
-if ($svgCount -lt 12) {
-    Write-Host "Primary SVG assets not fully present. Attempting to download..."
+$pngCount = (Get-ChildItem "assets/pieces" -Filter "*.png" | Measure-Object).Count
+if ($pngCount -lt 12) {
+    Write-Host "Primary PNG assets not fully present. Attempting to download..."
     python download_assets.py
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "SVG download failed. Generating fallback PNG assets..."
+        Write-Host "PNG download failed. Generating fallback PNG assets..."
         python asset_manager.py
     }
 } else {
-    Write-Host "Primary SVG assets found."
+    Write-Host "Primary PNG assets found."
 }
 
 # Run the main application

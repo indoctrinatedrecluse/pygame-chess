@@ -50,13 +50,14 @@ else:
 
 STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), STOCKFISH_EXECUTABLE)
 
-# Difficulty levels (0-20).
 DIFFICULTY_LEVELS = {
-    'Easy': 1,
-    'Medium': 5,
-    'Hard': 10,
-    'Expert': 20
+    'Easy':   {'skill': 1, 'blunder_chance': 40, 'top_n': 5},
+    'Medium': {'skill': 5, 'blunder_chance': 20, 'top_n': 3},
+    'Hard':   {'skill': 10, 'blunder_chance': 5, 'top_n': 2},
+    'Expert': {'skill': 20, 'blunder_chance': 0, 'top_n': 1}
 }
-DEFAULT_DIFFICULTY = DIFFICULTY_LEVELS['Easy']
+CURRENT_DIFFICULTY = 'Medium'
 
+# This will be updated by the side selection menu
+PLAYER_PLAYS_AS = chess.WHITE
 AI_PLAYS_AS = chess.BLACK
