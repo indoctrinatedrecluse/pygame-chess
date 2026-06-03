@@ -6,19 +6,16 @@ on:
       - 'v*' # Trigger the workflow on version tags like v1.0, v1.1, etc.
 
 jobs:
-  build:
-    name: Build for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest] # Removed macos-latest
+  build-windows:
+    name: Build for Windows
+    runs-on: windows-latest
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v4 # Updated to v4
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v5 # Updated to v5
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
 
@@ -26,51 +23,36 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+      shell: pwsh
 
-    - name: Download and set up Stockfish
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          chmod +x runfile.sh
-          ./runfile.sh
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          ./runfile.ps1
-        fi
-      shell: bash
+    - name: Download and set up assets & Stockfish
+      run: ./runfile.ps1
+      shell: pwsh
 
     - name: Build the executable
-      run: |
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          chmod +x build.sh
-          ./build.sh
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          ./build.ps1
-        fi
-      shell: bash
+      run: ./build.ps1
+      shell: pwsh
 
     - name: Prepare Release Artifacts
       run: |
-        mkdir -p release
-        if [ "$RUNNER_OS" == "Linux" ]; then
-          mv dist/PygameChess release/PygameChess-Linux
-        elif [ "$RUNNER_OS" == "Windows" ]; then
-          mv dist/PygameChess.exe release/PygameChess-Windows.exe
-        fi
+        mkdir release
+        mv dist/PygameChess.exe release/PygameChess-Windows.exe
       shell: bash
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v4 # Updated to v4
+      uses: actions/upload-artifact@v4
       with:
-        name: executable-${{ matrix.os }}
+        name: executable-windows
         path: release/
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: build-windows
     runs-on: ubuntu-latest
 
     steps:
     - name: Download all build artifacts
-      uses: actions/download-artifact@v4 # Updated to v4
+      uses: actions/download-artifact@v4
       with:
         path: artifacts/
 
@@ -83,20 +65,9 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         body: |
-          Automated release of Pygame Chess.
-          Download the executable for your operating system below.
+          Automated release of Pygame Chess for Windows.
         draft: false
         prerelease: false
-
-    - name: Upload Release Assets (Linux)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: artifacts/executable-ubuntu-latest/PygameChess-Linux
-        asset_name: PygameChess-Linux
-        asset_content_type: application/octet-stream
 
     - name: Upload Release Assets (Windows)
       uses: actions/upload-release-asset@v1
@@ -104,6 +75,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: artifacts/executable-windows-latest/PygameChess-Windows.exe
+        asset_path: artifacts/executable-windows/PygameChess-Windows.exe
         asset_name: PygameChess-Windows.exe
         asset_content_type: application/vnd.microsoft.portable-executable
