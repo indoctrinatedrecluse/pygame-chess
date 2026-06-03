@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*' # Trigger the workflow on version tags like v1.0, v1.1, etc.
 
+# Add this permissions block
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Build for Windows
