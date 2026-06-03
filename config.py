@@ -2,6 +2,7 @@ import pygame
 import chess
 import os
 import sys
+from utils import resource_path
 
 # Screen dimensions
 WIDTH = 800
@@ -38,7 +39,7 @@ UI_FONT = None
 UI_FONT_LARGE = None
 
 # Paths
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), 'assets')
+ASSETS_DIR = resource_path('assets')
 PIECES_DIR = os.path.join(ASSETS_DIR, 'pieces')
 SOUNDS_DIR = os.path.join(ASSETS_DIR, 'sounds')
 
@@ -48,7 +49,7 @@ if sys.platform == "win32":
 else:
     STOCKFISH_EXECUTABLE = "stockfish"
 
-STOCKFISH_PATH = os.path.join(os.path.dirname(__file__), STOCKFISH_EXECUTABLE)
+STOCKFISH_PATH = resource_path(STOCKFISH_EXECUTABLE)
 
 DIFFICULTY_LEVELS = {
     'Easy':   {'skill': 1, 'blunder_chance': 40, 'top_n': 5},

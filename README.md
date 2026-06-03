@@ -2,8 +2,6 @@
 
 A feature-rich, single-player chess game built with Python and Pygame. Play against a configurable Stockfish AI opponent and analyze your games.
 
-![Gameplay Screenshot](https://i.imgur.com/your_screenshot.png) 
-*(You can replace this with a real screenshot of your game)*
 
 ## Features
 

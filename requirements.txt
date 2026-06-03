@@ -1,4 +1,6 @@
 pygame-ce
 python-chess
+setuptools
 requests
 stockfish
+pyinstaller
