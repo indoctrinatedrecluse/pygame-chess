@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.0.0] - YYYY-MM-DD
+## [v1.1.0]
+
+### Added
+- Re-introduced the Linux build to the GitHub Actions workflow.
+- The release process now automatically builds and attaches both Windows and Linux executables.
+
+### Fixed
+- Corrected GitHub Actions workflow permissions to allow release creation.
+- Resolved build hanging issue by creating separate CI setup scripts (`setup_ci.sh`, `setup_ci.ps1`) that do not launch the main application.
+- Made Pygame audio initialization optional to prevent crashes in headless environments like GitHub runners.
+
+## [v1.0.0]
 
 ### Added
 - Initial release of the Pygame Chess application.

@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*' # Trigger the workflow on version tags like v1.0, v1.1, etc.
 
-# Add this permissions block
 permissions:
   contents: write
 
@@ -13,53 +12,80 @@ jobs:
   build-windows:
     name: Build for Windows
     runs-on: windows-latest
-
     steps:
     - name: Check out code
       uses: actions/checkout@v4
-
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.10'
-
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
       shell: pwsh
-
     - name: Run CI Setup Script (Assets & Stockfish)
       run: ./setup_ci.ps1
       shell: pwsh
-
     - name: Build the executable
       run: ./build.ps1
       shell: pwsh
-
     - name: Prepare Release Artifacts
       run: |
         mkdir release
         mv dist/PygameChess.exe release/PygameChess-Windows.exe
       shell: bash
-
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: executable-windows
         path: release/
 
+  build-linux:
+    name: Build for Linux
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libasound2-dev # For audio support
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Run CI Setup Script (Assets & Stockfish)
+      run: |
+        chmod +x setup_ci.sh
+        ./setup_ci.sh
+    - name: Build the executable
+      run: |
+        chmod +x build.sh
+        ./build.sh
+    - name: Prepare Release Artifacts
+      run: |
+        mkdir release
+        mv dist/PygameChess release/PygameChess-Linux
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: executable-linux
+        path: release/
+
   release:
     name: Create GitHub Release
-    needs: build-windows
+    needs: [build-windows, build-linux] # Depends on both builds
     runs-on: ubuntu-latest
-
     steps:
     - name: Download all build artifacts
       uses: actions/download-artifact@v4
       with:
         path: artifacts/
-
     - name: Create Release
       id: create_release
       uses: actions/create-release@v1
@@ -69,10 +95,10 @@ jobs:
         tag_name: ${{ github.ref }}
         release_name: Release ${{ github.ref }}
         body: |
-          Automated release of Pygame Chess for Windows.
+          Automated release of Pygame Chess.
+          Download the executable for your operating system below.
         draft: false
         prerelease: false
-
     - name: Upload Release Assets (Windows)
       uses: actions/upload-release-asset@v1
       env:
@@ -82,3 +108,12 @@ jobs:
         asset_path: artifacts/executable-windows/PygameChess-Windows.exe
         asset_name: PygameChess-Windows.exe
         asset_content_type: application/vnd.microsoft.portable-executable
+    - name: Upload Release Assets (Linux)
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: artifacts/executable-linux/PygameChess-Linux
+        asset_name: PygameChess-Linux
+        asset_content_type: application/octet-stream
