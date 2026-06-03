@@ -25,8 +25,8 @@ jobs:
         pip install -r requirements.txt
       shell: pwsh
 
-    - name: Download and set up assets & Stockfish
-      run: ./runfile.ps1
+    - name: Run CI Setup Script (Assets & Stockfish)
+      run: ./setup_ci.ps1
       shell: pwsh
 
     - name: Build the executable
