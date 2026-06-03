@@ -11,16 +11,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest] # Removed macos-latest
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # Updated to v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5 # Updated to v5
       with:
-        python-version: '3.10' # Use a stable Python version
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
@@ -29,9 +29,7 @@ jobs:
 
     - name: Download and set up Stockfish
       run: |
-        # The run scripts already contain the logic to download Stockfish.
-        # We just need to make them executable and run them.
-        if [ "$RUNNER_OS" == "Linux" ] || [ "$RUNNER_OS" == "macOS" ]; then
+        if [ "$RUNNER_OS" == "Linux" ]; then
           chmod +x runfile.sh
           ./runfile.sh
         elif [ "$RUNNER_OS" == "Windows" ]; then
@@ -41,7 +39,7 @@ jobs:
 
     - name: Build the executable
       run: |
-        if [ "$RUNNER_OS" == "Linux" ] || [ "$RUNNER_OS" == "macOS" ]; then
+        if [ "$RUNNER_OS" == "Linux" ]; then
           chmod +x build.sh
           ./build.sh
         elif [ "$RUNNER_OS" == "Windows" ]; then
@@ -51,20 +49,16 @@ jobs:
 
     - name: Prepare Release Artifacts
       run: |
-        # The executable is created in the 'dist' folder.
-        # We'll rename it to include the OS and move it to a common 'release' folder.
         mkdir -p release
         if [ "$RUNNER_OS" == "Linux" ]; then
           mv dist/PygameChess release/PygameChess-Linux
-        elif [ "$RUNNER_OS" == "macOS" ]; then
-          mv dist/PygameChess release/PygameChess-macOS
-        elif [ "$RUN_OS" == "Windows" ]; then
+        elif [ "$RUNNER_OS" == "Windows" ]; then
           mv dist/PygameChess.exe release/PygameChess-Windows.exe
         fi
       shell: bash
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4 # Updated to v4
       with:
         name: executable-${{ matrix.os }}
         path: release/
@@ -76,7 +70,7 @@ jobs:
 
     steps:
     - name: Download all build artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4 # Updated to v4
       with:
         path: artifacts/
 
@@ -94,7 +88,7 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Upload Release Assets
+    - name: Upload Release Assets (Linux)
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,15 +97,7 @@ jobs:
         asset_path: artifacts/executable-ubuntu-latest/PygameChess-Linux
         asset_name: PygameChess-Linux
         asset_content_type: application/octet-stream
-    - name: Upload Release Assets (macOS)
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: artifacts/executable-macos-latest/PygameChess-macOS
-        asset_name: PygameChess-macOS
-        asset_content_type: application/octet-stream
+
     - name: Upload Release Assets (Windows)
       uses: actions/upload-release-asset@v1
       env:
